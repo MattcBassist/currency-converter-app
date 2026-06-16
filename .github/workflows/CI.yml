@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - bugfix
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository changes
+        uses: actions/checkout@v4
+
+      - name: Set up Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Flask and project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run home page test
+        run: pytest tests/test_app.py::test_home_page_loads
+
+      - name: Run empty amount validation test
+        run: pytest tests/test_app.py::test_empty_amount_does_not_crash
+
+      - name: Run non-numeric amount validation test
+        run: pytest tests/test_app.py::test_non_numeric_amount_does_not_crash
+
+      - name: Run USD to GBP conversion test
+        run: pytest tests/test_app.py::test_10_usd_to_gbp
+
+      - name: Run GBP to EUR conversion test
+        run: pytest tests/test_app.py::test_1_gbp_to_eur
+
+      - name: Run EUR to USD conversion test
+        run: pytest tests/test_app.py::test_23_eur_to_usd
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:latest .
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:latest ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:${{ github.sha }}
+
+      - name: Test container launch from Docker image
+        run: |
+          docker run -d --name currency-converter-test -p 5000:5000 ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:latest
+          sleep 5
+          docker ps
+          docker exec currency-converter-test python --version
+          docker stop currency-converter-test
+          docker rm currency-converter-test
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image to DockerHub
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/currency-converter-app:${{ github.sha }}
