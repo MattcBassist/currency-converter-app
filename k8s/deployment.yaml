@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currency-converter-deployment
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: currency-converter
+  template:
+    metadata:
+      labels:
+        app: currency-converter
+    spec:
+      containers:
+      - name: currency-converter
+        image: mattcbassist/currency-converter-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
