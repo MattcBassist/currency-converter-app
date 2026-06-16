@@ -31,6 +31,10 @@
         <button type="submit">Convert</button>
     </form>
 
+    {% if error %}
+        <p>{{ error }}</p>
+    {% endif %}
+
     {% if result is not none %}
         <h2>Converted Amount: {{ result }}</h2>
     {% endif %}
