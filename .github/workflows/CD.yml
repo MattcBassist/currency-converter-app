@@ -1,0 +1,41 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+jobs:
+  deploy-to-kubernetes:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Minikube and Kubernetes status
+        run: |
+          sudo minikube status
+          sudo kubectl get nodes
+
+      - name: Pull passed Docker image
+        run: |
+          sudo docker pull mattcbassist/currency-converter-app:${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy passed build to Kubernetes
+        run: |
+          sudo kubectl set image deployment/currency-converter-deployment currency-converter=mattcbassist/currency-converter-app:${{ github.event.workflow_run.head_sha }}
+          sudo kubectl rollout status deployment/currency-converter-deployment
+
+      - name: Show Kubernetes deployment status
+        run: |
+          sudo kubectl get pods -o wide
+          sudo kubectl get deployments
+          sudo kubectl get services
+
+      - name: Test application through Minikube NodePort
+        run: |
+          curl http://$(sudo minikube ip):30080
